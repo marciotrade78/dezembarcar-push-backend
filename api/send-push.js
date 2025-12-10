@@ -1,23 +1,39 @@
 const webpush = require("web-push");
 
-const publicVapidKey = process.env.VAPID_PUBLIC_KEY;
-const privateVapidKey = process.env.VAPID_PRIVATE_KEY;
-const contactEmail = process.env.VAPID_CONTACT || "mailto:seuemail@exemplo.com";
-
-// Configura o Web Push com suas chaves VAPID
-webpush.setVapidDetails(contactEmail, publicVapidKey, privateVapidKey);
-
 module.exports = async (req, res) => {
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "Método não permitido. Use POST." });
-    return;
+  // Se alguém acessar via GET no navegador, só responde ok
+  if (req.method === "GET") {
+    return res.status(200).json({ message: "API DezEmbarcar Push online. Use POST." });
   }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Método não permitido. Use POST." });
+  }
+
+  const publicVapidKey = process.env.VAPID_PUBLIC_KEY;
+  const privateVapidKey = process.env.VAPID_PRIVATE_KEY;
+  const contactEmail =
+    process.env.VAPID_CONTACT || "mailto:seuemail@exemplo.com";
+
+  if (!publicVapidKey || !privateVapidKey) {
+    console.error("VAPID KEY AUSENTE", {
+      hasPublic: !!publicVapidKey,
+      hasPrivate: !!privateVapidKey,
+    });
+    return res
+      .status(500)
+      .json({ error: "VAPID keys não configuradas no servidor." });
+  }
+
+  // Configura o Web Push com suas chaves VAPID
+  webpush.setVapidDetails(contactEmail, publicVapidKey, privateVapidKey);
 
   const { subscription, title, body } = req.body || {};
 
   if (!subscription) {
-    res.status(400).json({ error: "Subscription (inscrição do navegador) é obrigatória." });
-    return;
+    return res
+      .status(400)
+      .json({ error: "Subscription (inscrição do navegador) é obrigatória." });
   }
 
   const payload = JSON.stringify({
@@ -27,9 +43,9 @@ module.exports = async (req, res) => {
 
   try {
     await webpush.sendNotification(subscription, payload);
-    res.status(201).json({ success: true });
+    return res.status(201).json({ success: true });
   } catch (err) {
     console.error("Erro ao enviar push:", err);
-    res.status(500).json({ error: "Erro ao enviar notificação." });
+    return res.status(500).json({ error: "Erro ao enviar notificação." });
   }
 };
